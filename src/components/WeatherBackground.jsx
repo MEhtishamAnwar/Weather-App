@@ -1,5 +1,3 @@
-import React from 'react';
-
 import Thunderstorm from '../assets/Thunderstorm.gif';
 import Rain from '../assets/Rain.gif';
 import SnowDay from '../assets/Snow.gif';

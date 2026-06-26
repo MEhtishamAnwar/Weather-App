@@ -1,5 +1,4 @@
-import React, { useEffect } from 'react'
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import WeatherBackground from './components/WeatherBackground'
 import { convertTemperature, getHumidityValue, getVisibilityValue } from './components/Helper.jsx'
 import { HumidityIcon, SunriseIcon, SunsetIcon, VisibilityIcon, WindIcon } from './components/Icons.jsx'
@@ -11,15 +10,9 @@ const API_KEY= import.meta.env.VITE_WEATHER_API_KEY;
   const [suggestion, setSuggestion] = useState([])
   const [unit, setUnit] = useState('C')
   const [error, setError] = useState('')
+  const [weatherCondition, setWeatherCondition] = useState(null)
 
-  useEffect(()=>{
-    if(city.trim().length>=3&&  !weather){
-      const timer=setTimeout(()=> fetchSuggestions(city),500)
-      return ()=> clearTimeout(timer);
-    }
-    setSuggestion([]);
-  },[city,weather])
-  const fetchSuggestions= async (query)=>{
+  const fetchSuggestions= useCallback(async (query)=>{
     try{
       const res= await fetch(
         `http://api.openweathermap.org/geo/1.0/direct?q=${query}&limit=5&appid=${API_KEY}`
@@ -29,14 +22,28 @@ const API_KEY= import.meta.env.VITE_WEATHER_API_KEY;
     catch{
       setSuggestion([]);
     }
-  }
+  }, [API_KEY])
+
+  useEffect(()=>{
+    if(city.trim().length>=3&&  !weather){
+      const timer=setTimeout(()=> fetchSuggestions(city),500)
+      return ()=> clearTimeout(timer);
+    }
+  },[city,weather,fetchSuggestions])
+
   const fetchWeatherData = async (url,name='')=>{
     setError('');
     setWeather(null);
+    setWeatherCondition(null);
     try{
       const response=await fetch(url)
       if(!response.ok) throw new  Error((await response.json()).message|| 'City not found')
        const data =await response.json();
+      const currentTime = Date.now() / 1000;
+      setWeatherCondition({
+        main: data.weather[0].main,
+        isDay: currentTime > data.sys.sunrise && currentTime < data.sys.sunset
+      });
       setWeather(data);
       setCity(name||data.name)
       setSuggestion([]);
@@ -54,13 +61,14 @@ const API_KEY= import.meta.env.VITE_WEATHER_API_KEY;
       `https://api.openweathermap.org/data/2.5/weather?q=${city.trim()}&appid=${API_KEY}&units=metric`
     )
   }
-  const getWeatherCondition=()=> weather && ({
-    main: weather.weather[0].main,
-    isDay: Date.now() /1000> weather.sys.sunrise && Date.now()/1000  <weather.sys.sunset
-  })
+  const handleCityChange = (e) => {
+    const value = e.target.value;
+    setCity(value);
+    if (value.trim().length < 3) setSuggestion([]);
+  }
   return (
     <div className='min-h-screen w-full '>
-      <WeatherBackground condition={getWeatherCondition()}/>
+      <WeatherBackground condition={weatherCondition}/>
       <div className="flex items-center justify-center px-3 py-4 sm:px-4 sm:py-6 min-h-screen w-full ">
         <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-4 sm:p-6 md:p-8 w-full max-w-lg md:max-w-xl lg:max-w-1xl xl:max-w-1xl xl:h-fit text-white border border-white/20 shadow-2xl shadow-black/30 relative z-10 leading-1.5">
         <h1 className='text-2xl sm:text-3xl font-extrabold text-center mb-4 sm:mb-6'>
@@ -71,13 +79,13 @@ const API_KEY= import.meta.env.VITE_WEATHER_API_KEY;
             <input
               type="text"
               value={city}
-              onChange={(e) => setCity(e.target.value)}
+              onChange={handleCityChange}
               placeholder='Enter City or Country (min 3 letters)'
               className='w-full mb-2 p-3 rounded-xl border border-white/40 bg-white/10 text-white placeholder-white/70 focus:outline-none focus:border-blue-300 focus:bg-white/20 transition duration-300'
             />
             {suggestion.length > 0 && (
               <div className="absolute top-12 left-0 right-0 bg-transparent shadow-md rounded z-10">
-                {suggestion.map((s, indx) => (
+                {suggestion.map((s) => (
                   <button
                     key={`${s.lat}-${s.lon}`}
                     type='button'
@@ -98,7 +106,7 @@ const API_KEY= import.meta.env.VITE_WEATHER_API_KEY;
           </form>
         ) : (
           <div className="mt-2 sm:mt-4 text-center transition-opacity duration-500 ">
-            <button onClick={() => { setWeather(null); setCity('') }} className='mb-4 bg-purple-900 hover:bg-blue-700 text-white font-semibold py-2 px-3 rounded-xl transition-colors'>
+            <button onClick={() => { setWeather(null); setWeatherCondition(null); setCity(''); setSuggestion([]) }} className='mb-4 bg-purple-900 hover:bg-blue-700 text-white font-semibold py-2 px-3 rounded-xl transition-colors'>
               New Search
             </button>
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
